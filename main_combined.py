@@ -74,7 +74,9 @@ def send_email(to_email, student_name, grade, timestamp, action_type="check-in",
                     {f'<div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-top: 15px; border-left: 4px solid #ffc107;"><p style="margin: 0; color: #856404;"><strong>⚠️ Violation Recorded:</strong></p><p style="margin: 5px 0 0 0; color: #856404;"><strong>Type:</strong> {"Incomplete Uniform" if violation_type == "incomplete_uniform" else "Missing ID"}</p>{"<p style=\"margin: 5px 0 0 0; color: #856404;\"><strong>Details:</strong> " + violation_details + "</p>" if violation_details else ""}{"<p style=\"margin: 5px 0 0 0; color: #856404;\"><strong>Total Violation Count:</strong> " + str(violation_count) + "</p>" if violation_count is not None else ""}</div>' if violation_type else ''}
                 </div>
                 
-                {f'<div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;"><p style="margin: 0; color: #721c24;"><strong>📋 Important Reminder:</strong></p><p style="margin: 5px 0 0 0; color: #721c24;">{"Your child is eligible to appeal their violation to the Guidance Office." if recipient_type == "parents" else "If you wish to appeal your violation, please visit the Guidance Office."}</p></div>' if violation_type else ''}
+                {f'<div style="background-color: #dc3545; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 5px solid #721c24;"><p style="margin: 0; color: #ffffff; font-size: 16px; font-weight: bold;"><strong>🚨 Important Message:</strong></p><p style="margin: 10px 0 0 0; color: #ffffff; font-size: 14px;">{"Your child has reached their 3rd Violation Warning. They need to complete Community Service. Their violation count will be reset after they complete the Community Service." if recipient_type == "parents" else "You have reached your 3rd Violation Warning. You need to complete Community Service. Your violation count will be reset after you complete the Community Service."}</p></div>' if violation_type and violation_count == 3 else ''}
+                
+                {f'<div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;"><p style="margin: 0; color: #721c24;"><strong>📋 Important Reminder:</strong></p><p style="margin: 5px 0 0 0; color: #721c24;">{"Your child is eligible to appeal their violation to the Guidance Office." if recipient_type == "parents" else "If you wish to appeal your violation, please visit the Guidance Office."}</p></div>' if violation_type and violation_count != 3 else ''}
                 
                 <div style="background-color: #e8f4fd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #2980b9;">
                     <p style="margin: 0; color: #2980b9;">
@@ -139,12 +141,20 @@ def send_sms(to_phone, student_name, grade, timestamp, action_type="check-in", r
     if recipient_type == "student":
         if action_type == "check-in":
             if violation_type:
-                violation_msg = f"⚠️ Violation: {'Incomplete Uniform' if violation_type == 'incomplete_uniform' else 'Missing ID'}"
+                violation_msg = f"Violation: {'Incomplete Uniform' if violation_type == 'incomplete_uniform' else 'Missing ID'}"
                 if violation_details:
                     violation_msg += f" - {violation_details}"
                 count_msg = f" Total Violations: {violation_count}" if violation_count is not None else ""
-                reminder_msg = " If you wish to appeal, please visit the Guidance Office."
-                message = f"Hi {student_name}! You have checked in at {timestamp} with a violation. {violation_msg}.{count_msg}{reminder_msg} Welcome to STI College Balagtas\n\nPowered by AI-niform Technology"
+                
+                # Special message for 3rd violation
+                if violation_count == 3:
+                    important_msg = " Important Message: You have reached your 3rd Violation Warning. You need to complete Community Service. Your violation count will be reset after you complete the Community Service."
+                    reminder_msg = ""
+                else:
+                    important_msg = ""
+                    reminder_msg = " If you wish to appeal, please visit the Guidance Office."
+                
+                message = f"Hi {student_name}! You have checked in at {timestamp} with a violation. {violation_msg}.{count_msg}{important_msg}{reminder_msg} Welcome to STI College Balagtas\n\nPowered by AI-niform Technology"
             else:
                 message = f"Hi {student_name}! You have successfully checked in at {timestamp}. Welcome to STI College Balagtas\n\nPowered by AI-niform Technology"
         else:  # check-out
@@ -152,12 +162,20 @@ def send_sms(to_phone, student_name, grade, timestamp, action_type="check-in", r
     else:  # parents
         if action_type == "check-in":
             if violation_type:
-                violation_msg = f"⚠️ Violation: {'Incomplete Uniform' if violation_type == 'incomplete_uniform' else 'Missing ID'}"
+                violation_msg = f"Violation: {'Incomplete Uniform' if violation_type == 'incomplete_uniform' else 'Missing ID'}"
                 if violation_details:
                     violation_msg += f" - {violation_details}"
                 count_msg = f" Total Violations: {violation_count}" if violation_count is not None else ""
-                reminder_msg = " Your child is eligible to appeal their violation to the Guidance Office."
-                message = f"Dear Parent, {student_name} ({grade}) has checked in at {timestamp} with a violation. {violation_msg}.{count_msg}{reminder_msg} Your child is now at STI College Balagtas.\n\nPowered by AI-niform Technology"
+                
+                # Special message for 3rd violation
+                if violation_count == 3:
+                    important_msg = " Important Message: Your child has reached their 3rd Violation Warning. They need to complete Community Service. Their violation count will be reset after they complete the Community Service."
+                    reminder_msg = ""
+                else:
+                    important_msg = ""
+                    reminder_msg = " Your child is eligible to appeal their violation to the Guidance Office."
+                
+                message = f"Dear Parent, {student_name} ({grade}) has checked in at {timestamp} with a violation. {violation_msg}.{count_msg}{important_msg}{reminder_msg} Your child is now at STI College Balagtas.\n\nPowered by AI-niform Technology"
             else:
                 message = f"Dear Parent, {student_name} ({grade}) has successfully checked in at {timestamp}. Your child is now at STI College Balagtas.\n\nPowered by AI-niform Technology"
         else:  # check-out
