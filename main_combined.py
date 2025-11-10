@@ -218,6 +218,121 @@ def send_sms(to_phone, student_name, grade, timestamp, action_type="check-in", r
         print(f"❌ Error sending SMS: {str(e)}")
         return False
 
+def send_appeal_email(to_email, student_name, grade, timestamp, recipient_type="student"):
+    """
+    Send appeal notification email
+    """
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_SENDER
+        msg['To'] = to_email
+        msg['Subject'] = f"Appeal Submitted - {student_name}"
+        
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #ffffff;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px 10px 0 0; margin: -20px -20px 20px -20px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">AI-niform</h1>
+                    <p style="color: #e8f4fd; margin: 5px 0 0 0; font-size: 14px;">Smart School Management System</p>
+                </div>
+                
+                <h2 style="color: #2c3e50; text-align: center; margin-top: 0;">Appeal Submission Notification</h2>
+                
+                <div style="background-color: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+                    <h3 style="color: #155724; margin-top: 0;">Appeal Submitted Successfully</h3>
+                    <p><strong>Student Name:</strong> {student_name}</p>
+                    <p><strong>Grade Level:</strong> {grade}</p>
+                    <p><strong>Submission Time:</strong> {timestamp}</p>
+                    <p style="margin-top: 15px;"><strong>Status:</strong> {"Your child has" if recipient_type == "parents" else "You have"} successfully submitted an appeal to the Guidance Office.</p>
+                </div>
+                
+                <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                    <p style="margin: 0; color: #856404;"><strong>📋 Important Reminder:</strong></p>
+                    <p style="margin: 5px 0 0 0; color: #856404;">According to school policy, whether {"your child's" if recipient_type == "parents" else "your"} appeal is valid or not valid, {"your child's" if recipient_type == "parents" else "your"} violation count will remain unchanged and will still be counted.</p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                    <p style="color: #7f8c8d; font-size: 12px; margin: 0;">
+                        <strong>AI-niform School Management System</strong><br>
+                        This is an automated message from the Appeal System.<br>
+                        Please do not reply to this email.
+                    </p>
+                    <p style="color: #667eea; font-size: 10px; margin: 10px 0 0 0;">
+                        Powered by AI-niform Technology
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(body, 'html'))
+        
+        server = smtplib.SMTP(EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT)
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        text = msg.as_string()
+        server.sendmail(EMAIL_SENDER, to_email, text)
+        server.quit()
+        
+        print(f"✅ Appeal email sent to {to_email}: {student_name} ({grade})")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error sending appeal email: {str(e)}")
+        return False
+
+def send_appeal_sms(to_phone, student_name, grade, timestamp, recipient_type="student"):
+    """
+    Send appeal notification SMS
+    """
+    # Format phone number for Philippines
+    if not to_phone.startswith('+63'):
+        if to_phone.startswith('0'):
+            to_phone = '+63' + to_phone[1:]
+        elif to_phone.startswith('63'):
+            to_phone = '+' + to_phone
+        else:
+            to_phone = '+63' + to_phone
+    
+    if recipient_type == "student":
+        message = f"Hi {student_name}! Your appeal has been submitted to the Guidance Office at {timestamp}. Important Reminder: According to school policy, whether your appeal is valid or not valid, your violation count will remain unchanged and will still be counted.\n\nPowered by AI-niform Technology"
+    else:  # parents
+        message = f"Dear Parent, {student_name} ({grade}) has submitted an appeal to the Guidance Office at {timestamp}. Important Reminder: According to school policy, whether the appeal is valid or not valid, your child's violation count will remain unchanged and will still be counted.\n\nPowered by AI-niform Technology"
+    
+    data = {
+        'recipient': to_phone,
+        'sender_id': PHILSMS_SENDER_NAME,
+        'type': 'plain',
+        'message': message
+    }
+    
+    headers = {
+        'Authorization': f'Bearer {PHILSMS_API_TOKEN}',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    
+    try:
+        response = requests.post(PHILSMS_URL, json=data, headers=headers)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('status') == 'success':
+                print(f"✅ Appeal SMS sent to {to_phone}: {student_name} ({grade})")
+                return True
+            else:
+                print(f"❌ Appeal SMS failed: {result.get('message', 'Unknown error')}")
+                return False
+        else:
+            print(f"❌ HTTP Error {response.status_code}: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error sending appeal SMS: {str(e)}")
+        return False
+
 def send_combined_notification(email, phone, student_name, grade, timestamp, action_type="check-in", recipient_type="parents", violation_type=None, violation_details=None, violation_count=None):
     """
     Send both email and SMS notifications simultaneously
@@ -351,6 +466,77 @@ def get_violation_count_from_firebase(student_number):
         print(f"[WARNING] Error getting violation count: {str(e)}")
         return 0
 
+def save_appeal_to_firebase(student_name, grade, timestamp, student_number, email=None, phone=None):
+    """
+    Save appeal log to student_violations collection
+    Does NOT deduct violation count, only logs the appeal
+    """
+    try:
+        # Check if service account key file exists before initializing
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        service_account_path = os.path.join(script_dir, "serviceAccountKey.json")
+        
+        if not os.path.exists(service_account_path):
+            print(f"\n[WARNING] serviceAccountKey.json not found at: {service_account_path}")
+            print(f"         Appeal not saved to Firebase.")
+            return False
+        
+        if not student_number:
+            print(f"\n[WARNING] Student Number not provided. Appeal not saved to Firebase.")
+            return False
+        
+        db = initialize_firebase()
+        
+        # Check if student has violations
+        student_violations_ref = db.collection("student_violations")
+        student_violation_doc = student_violations_ref.document(str(student_number))
+        existing_data = student_violation_doc.get()
+        
+        if not existing_data.exists:
+            print(f"\n[ERROR] Student {student_number} does not have any violations in the system.")
+            return False
+        
+        current_data = existing_data.to_dict()
+        violation_count = current_data.get('violation_count', 0)
+        
+        if violation_count == 0:
+            print(f"\n[ERROR] Student {student_number} has no violations. Cannot process appeal.")
+            return False
+        
+        # Prepare appeal data
+        appeal_data = {
+            "student_name": student_name,
+            "grade": grade,
+            "timestamp": timestamp,
+            "appeal_type": "guidance_office",
+            "appeal_status": "submitted",
+            "recorded_at": datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        }
+        
+        # Add contact info if provided
+        if email:
+            appeal_data["student_email"] = email
+        if phone:
+            appeal_data["student_phone"] = phone
+        
+        # Save appeal to appeals subcollection (does not affect violation count)
+        appeal_id = datetime.now(pytz.timezone('Asia/Manila')).strftime("%Y%m%d_%H%M%S")
+        student_violation_doc.collection("appeals").document(appeal_id).set(appeal_data)
+        
+        print(f"\n[OK] Appeal logged for student {student_number}")
+        print(f"     Appeal ID: {appeal_id}")
+        print(f"     Current violation count: {violation_count} (unchanged)")
+        
+        return True
+        
+    except FileNotFoundError as e:
+        print(f"\n[WARNING] serviceAccountKey.json not found. Appeal not saved to Firebase.")
+        print(f"         Error: {str(e)}")
+        return False
+    except Exception as e:
+        print(f"\n[WARNING] Error saving appeal to Firebase: {str(e)}")
+        return False
+
 def save_violation_to_firebase(student_name, grade, timestamp, violation_type, violation_details=None, email=None, phone=None, violation_count=None, student_number=None):
     """
     Save violation record to student_violations collection using Student Number as document ID
@@ -455,35 +641,47 @@ print("Combined Email + SMS Notification System")
 print("=" * 50)
 print("This will send both email and SMS notifications")
 
-# Ask for recipient type (Student or Parents + Student)
+# Ask for recipient type (Student, Parents + Student, or Appeal Student)
 print("\nSelect recipient type:")
 print("1. Student")
 print("2. Parents + Student")
+print("3. Appeal Student")
 while True:
-    recipient_choice = input("Enter your choice (1 or 2): ").strip()
+    recipient_choice = input("Enter your choice (1, 2, or 3): ").strip()
     if recipient_choice == "1":
         recipient_type = "student"
         break
     elif recipient_choice == "2":
         recipient_type = "parents"
         break
+    elif recipient_choice == "3":
+        recipient_type = "appeal"
+        break
     else:
-        print("❌ Invalid choice. Please enter 1 or 2.")
+        print("❌ Invalid choice. Please enter 1, 2, or 3.")
 
-# Ask for action type (check-in or check-out)
-print(f"\nSelect action type for {recipient_type}:")
-print("1. Check-in")
-print("2. Check-out")
-while True:
-    choice = input("Enter your choice (1 or 2): ").strip()
-    if choice == "1":
-        action_type = "check-in"
-        break
-    elif choice == "2":
-        action_type = "check-out"
-        break
-    else:
-        print("❌ Invalid choice. Please enter 1 or 2.")
+# Handle appeal flow separately
+if recipient_type == "appeal":
+    # Skip action type selection for appeals
+    action_type = "appeal"
+    violation_type = None
+    violation_details = None
+    violation_count = None
+else:
+    # Ask for action type (check-in or check-out)
+    print(f"\nSelect action type for {recipient_type}:")
+    print("1. Check-in")
+    print("2. Check-out")
+    while True:
+        choice = input("Enter your choice (1 or 2): ").strip()
+        if choice == "1":
+            action_type = "check-in"
+            break
+        elif choice == "2":
+            action_type = "check-out"
+            break
+        else:
+            print("❌ Invalid choice. Please enter 1 or 2.")
 
 # Initialize violation variables
 violation_type = None
@@ -533,6 +731,93 @@ student_number = selected_student.get('Student Number', selected_student.get('st
 # Extract parent information with multiple field name variations (prioritizing Firebase field names)
 parent_email = selected_student.get('Parent Gmail', selected_student.get('parent_email', selected_student.get('Parent Email', selected_student.get('parent_email_address', ''))))
 parent_phone = selected_student.get('Parent Number', selected_student.get('parent_phone', selected_student.get('Parent Phone', selected_student.get('parent_contact_number', selected_student.get('parent_mobile', '')))))
+
+# Handle appeal flow
+if recipient_type == "appeal":
+    # Check if student has violations
+    current_violation_count = get_violation_count_from_firebase(student_number)
+    
+    if current_violation_count == 0:
+        print(f"\n[ERROR] Student {student_number} ({student_name}) does not have any violations.")
+        print("        Cannot process appeal. The student must have at least one violation to submit an appeal.")
+        exit()
+    
+    # Get current timestamp
+    ph_tz = pytz.timezone('Asia/Manila')
+    timestamp = datetime.now(ph_tz).strftime("%Y-%m-%d %H:%M:%S Manila Time")
+    
+    print(f"\n📋 Appeal Information:")
+    print(f"  Student: {student_name} ({student_grade})")
+    print(f"  Student Number: {student_number}")
+    print(f"  Current Violation Count: {current_violation_count}")
+    print(f"  Submission Time: {timestamp}")
+    print("-" * 50)
+    
+    # Send appeal notifications
+    print(f"\n📧 Sending STUDENT EMAIL notification...")
+    student_email_success = send_appeal_email(student_email, student_name, student_grade, timestamp, "student")
+    
+    print(f"\n📱 Sending STUDENT SMS notification...")
+    student_sms_success = send_appeal_sms(student_phone, student_name, student_grade, timestamp, "student")
+    
+    # Send to parent if available
+    parent_email_success = True
+    parent_sms_success = True
+    
+    if parent_email:
+        print(f"\n📧 Sending PARENT EMAIL notification...")
+        parent_email_success = send_appeal_email(parent_email, student_name, student_grade, timestamp, "parents")
+    
+    if parent_phone:
+        print(f"\n📱 Sending PARENT SMS notification...")
+        parent_sms_success = send_appeal_sms(parent_phone, student_name, student_grade, timestamp, "parents")
+    
+    # Save appeal to Firebase
+    print(f"\n💾 Saving appeal to Firebase database...")
+    appeal_saved = save_appeal_to_firebase(
+        student_name=student_name,
+        grade=student_grade,
+        timestamp=timestamp,
+        student_number=student_number,
+        email=student_email,
+        phone=student_phone
+    )
+    
+    # Summary
+    print(f"\n" + "=" * 50)
+    print("APPEAL SUBMISSION SUMMARY")
+    print("=" * 50)
+    if student_email_success:
+        print("✅ Student email notification sent successfully!")
+    else:
+        print("❌ Student email notification failed!")
+    
+    if student_sms_success:
+        print("✅ Student SMS notification sent successfully!")
+    else:
+        print("❌ Student SMS notification failed!")
+    
+    if parent_email and parent_email_success:
+        print("✅ Parent email notification sent successfully!")
+    elif parent_email:
+        print("❌ Parent email notification failed!")
+    
+    if parent_phone and parent_sms_success:
+        print("✅ Parent SMS notification sent successfully!")
+    elif parent_phone:
+        print("❌ Parent SMS notification failed!")
+    
+    if appeal_saved:
+        print("✅ Appeal logged to Firebase successfully!")
+    else:
+        print("❌ Failed to log appeal to Firebase!")
+    
+    if student_email_success and student_sms_success and appeal_saved:
+        print("\n🎉 Appeal submitted successfully!")
+    else:
+        print("\n⚠️  Appeal submitted with some issues. Please check the logs above.")
+    
+    exit()
 
 # Validate that we have the necessary information
 if not student_email:
